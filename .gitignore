@@ -1,0 +1,13 @@
+build/
+cmake-build-*/
+*.db
+*.o
+*.a
+*.so
+compile_commands.json
+.idea/
+.vscode/
+*.user
+mpei_app
+CMakeCache.txt
+CMakeFiles/
