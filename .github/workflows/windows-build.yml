@@ -1,0 +1,58 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:   # ручной запуск кнопкой "Run workflow"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install vcpkg packages
+        run: |
+          vcpkg install curl:x64-windows sqlite3:x64-windows
+          vcpkg integrate install
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_PREFIX_PATH="$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows"
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Stage release folder
+        shell: pwsh
+        run: |
+          $out = "mpei_hub_windows"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          # binary (VS multi-config puts it in Release/)
+          $exe = Get-ChildItem -Path build -Recurse -Filter mpei_app.exe | Select-Object -First 1
+          if (-not $exe) { throw "mpei_app.exe not found" }
+          Copy-Item $exe.FullName $out/
+          # frontend next to exe (POST_BUILD may already copy into build/Release)
+          if (Test-Path "build/Release/frontend") {
+            Copy-Item -Recurse "build/Release/frontend" "$out/frontend"
+          } elseif (Test-Path "frontend") {
+            Copy-Item -Recurse "frontend" "$out/frontend"
+          }
+          # DLLs from vcpkg
+          $bin = "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin"
+          Copy-Item "$bin/*.dll" $out/ -ErrorAction SilentlyContinue
+          Get-ChildItem $out | Format-Table Name, Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpei-hub-windows
+          path: mpei_hub_windows/
+          if-no-files-found: error

@@ -80,6 +80,11 @@ target_link_libraries(mpei_app PRIVATE
     SQLite::SQLite3
     Threads::Threads
 )
+if(WIN32)
+  target_link_libraries(mpei_app PRIVATE ws2_32 mswsock)
+  # Crow / Asio on Windows
+  target_compile_definitions(mpei_app PRIVATE _WIN32_WINNT=0x0A00)
+endif()
 
 # Copy frontend next to binary
 add_custom_command(TARGET mpei_app POST_BUILD
